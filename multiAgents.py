@@ -73,32 +73,20 @@ class ReflexAgent(Agent):
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
-        # Weights for features
-        FOOD_SCORE_MULTIPLIER = 10.0
-        GHOST_PENALTY = -1000.0
-
         currentPos = successorGameState.getPacmanPosition()
         currentScore = successorGameState.getScore()
-
-        # Ghost distance logic
         ghostDistances = [manhattanDistance(currentPos, ghostState.getPosition()) 
                           for ghostState in newGhostStates if ghostState.scaredTimer == 0]
-        
         if ghostDistances:
             minGhostDist = min(ghostDistances)
             if minGhostDist < 2:
-                return GHOST_PENALTY
-
-        # Food distance logic
+                return -1000.0
         foodList = newFood.asList()
         minFoodDist = 0
         if foodList:
             minFoodDist = min([manhattanDistance(currentPos, food) for food in foodList])
-            
-        # Score calculation: maximize score, minimize food distance
         if minFoodDist > 0:
-            return currentScore + (FOOD_SCORE_MULTIPLIER / minFoodDist)
-        
+            return currentScore + (10.0 / minFoodDist)
         return currentScore
 
 def scoreEvaluationFunction(currentGameState):
@@ -139,51 +127,38 @@ class MinimaxAgent(MultiAgentSearchAgent):
     def getAction(self, gameState):
 
         def minValue(state, agentIndex, depth):
-            # If we've processed all ghosts, back to Pacman at next depth
             if agentIndex == state.getNumAgents():
                 return maxValue(state, depth + 1)
-            
             legalActions = state.getLegalActions(agentIndex)
             if not legalActions:
                 return self.evaluationFunction(state)
-            
             v = float('inf')
             for action in legalActions:
                 successor = state.generateSuccessor(agentIndex, action)
-                # Next is usually next ghost (agentIndex + 1), or back to Pacman if last ghost
                 v = min(v, minValue(successor, agentIndex + 1, depth) if agentIndex + 1 < state.getNumAgents() else maxValue(successor, depth + 1))
             return v
 
         def maxValue(state, depth):
-            # Terminal states or max depth reached
             if state.isWin() or state.isLose() or depth == self.depth:
                 return self.evaluationFunction(state)
-            
             legalActions = state.getLegalActions(0)
             if not legalActions:
                 return self.evaluationFunction(state)
-            
             v = float('-inf')
-            # Maximize over Pacman's actions
-            # Pacman (index 0) always followed by ghost 1
             for action in legalActions:
                 successor = state.generateSuccessor(0, action)
                 v = max(v, minValue(successor, 1, depth))
             return v
 
-        # Root level call: maximizing for Pacman
         legalActions = gameState.getLegalActions(0)
         bestAction = Directions.STOP
         bestInvokeScore = float('-inf')
-        
         for action in legalActions:
             successor = gameState.generateSuccessor(0, action)
-            # Start min layer for first ghost (index 1) at current depth (0)
             score = minValue(successor, 1, 0)
             if score > bestInvokeScore:
                 bestInvokeScore = score
                 bestAction = action
-                
         return bestAction
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
@@ -195,8 +170,52 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         """
         Returns the minimax action using self.depth and self.evaluationFunction
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def minValue(state, agentIndex, depth, alpha, beta):
+            if agentIndex == state.getNumAgents():
+                return maxValue(state, depth + 1, alpha, beta)
+            legalActions = state.getLegalActions(agentIndex)
+            if not legalActions:
+                return self.evaluationFunction(state)
+            v = float('inf')
+            for action in legalActions:
+                successor = state.generateSuccessor(agentIndex, action)
+                if agentIndex + 1 < state.getNumAgents():
+                    v = min(v, minValue(successor, agentIndex + 1, depth, alpha, beta))
+                else:
+                    v = min(v, maxValue(successor, depth + 1, alpha, beta))
+                if v < alpha:
+                    return v
+                beta = min(beta, v)
+            return v
+
+        def maxValue(state, depth, alpha, beta):
+            if state.isWin() or state.isLose() or depth == self.depth:
+                return self.evaluationFunction(state)
+            legalActions = state.getLegalActions(0)
+            if not legalActions:
+                return self.evaluationFunction(state)
+            v = float('-inf')
+            for action in legalActions:
+                successor = state.generateSuccessor(0, action)
+                v = max(v, minValue(successor, 1, depth, alpha, beta))
+                if v > beta:
+                    return v
+                alpha = max(alpha, v)
+            return v
+
+        legalActions = gameState.getLegalActions(0)
+        bestAction = Directions.STOP
+        bestInvokeScore = float('-inf')
+        alpha = float('-inf')
+        beta = float('inf')
+        for action in legalActions:
+            successor = gameState.generateSuccessor(0, action)
+            score = minValue(successor, 1, 0, alpha, beta)
+            if score > bestInvokeScore:
+                bestInvokeScore = score
+                bestAction = action
+            alpha = max(alpha, bestInvokeScore)
+        return bestAction
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
